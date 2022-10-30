@@ -1,22 +1,66 @@
 import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { Hero } from '../interface/hero';
 import { HEROES } from '../mock-heroes';
 import { MessageService } from './message.service';
+import { catchError, map, tap } from 'rxjs/operators';
 @Injectable({
   providedIn: 'root',
 })
 export class HeroService {
+  private heroesUrl = 'api/heroes';
+
+  httpOptions = {
+    headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
+  };
+
   getHeroes(): Observable<Hero[]> {
-    const heroes = of(HEROES);
-    this.messageService.add('HeroService: fetched heroes');
-    return heroes;
+    return this.http.get<Hero[]>(this.heroesUrl).pipe(
+      tap((_) => this.log('fetched heroes')),
+      catchError(this.handleError<Hero[]>('getHeroes', []))
+    );
   }
 
   getHero(id: number): Observable<Hero> {
-    const hero = HEROES.find((h) => h.id === id)!;
-    this.messageService.add(`HeroService: fetched hero id=${id}`);
-    return of(hero);
+    const url = `${this.heroesUrl}/${id}`;
+    return this.http.get<Hero>(url).pipe(
+      tap((_) => this.log(`fetched hero id = ${id}`)),
+      catchError(this.handleError<Hero>(`getHero id=${id}`))
+    );
   }
-  constructor(private messageService: MessageService) {}
+
+  updateHero(hero: Hero): Observable<any> {
+    return this.http.put(this.heroesUrl, hero, this.httpOptions).pipe(
+      tap((_) => this.log(`updated hero id= ${hero.id}`)),
+      catchError(this.handleError<any>('updateHero'))
+    );
+  }
+  private log(message: string) {
+    this.messageService.add(`HeroService: ${message}`);
+  }
+
+  /**
+   * Gérer l'opération Http qui a échoué.
+   * Laisser l'application continuer.
+   *
+   * @param operation - nom de l'opération qui a échoué
+   * @param result - valeur facultative à retourner comme résultat observable
+   */
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      // TODO: envoyer l'erreur à l'infrastructure de logging distante
+      console.error(error);
+      // TODO : un meilleur travail de transformation des erreurs pour la consommation des utilisateurs
+      this.log(`${operation} failed: ${error.message}`);
+
+      // Laissez l'application continuer à fonctionner en renvoyant un résultat vide.
+      return of(result as T);
+    };
+  }
+
+  constructor(
+    private http: HttpClient,
+    private messageService: MessageService
+  ) {}
 }
